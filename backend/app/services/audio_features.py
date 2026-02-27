@@ -113,6 +113,9 @@ def _extract_real(audio_bytes: bytes, sr: int) -> dict:
         # Load audio from the converted WAV file
         try:
             y, sr = librosa.load(wav_path, sr=sr, mono=True)
+        except ModuleNotFoundError as e:
+            logger.error(f"🚨 CRITICAL: Missing dependency preventing extraction: {e}. Refusing to fall back to mock.")
+            raise
         except Exception as e:
             logger.error("MOCK_AUDIO_PIPELINE_ACTIVE: librosa failed to decode audio format (%s). WebM Opus requires system FFmpeg. Falling back to mock acoustics.", e)
             return _extract_mock()
