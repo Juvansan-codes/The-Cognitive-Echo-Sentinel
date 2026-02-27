@@ -97,7 +97,7 @@ function MetricRow({ label, value, unit, limit, invertValue = false, description
 }
 
 export function Dashboard({ data }: DashboardProps) {
-    const { risk_scores, acoustic_features, lexical_analysis, cognitive_available } = data;
+    const { risk_scores, acoustic_features, lexical_analysis, lexical_metrics, cognitive_available } = data;
 
     // Map the neuro risk to specific text requested by user
     let riskStateText = "Within Baseline Range";
@@ -155,16 +155,16 @@ export function Dashboard({ data }: DashboardProps) {
                     </div>
                 </CardHeader>
                 <CardContent className="p-6 bg-card flex flex-col md:flex-row gap-8 items-center">
-                    {cognitive_available && lexical_analysis ? (
+                    {cognitive_available && (lexical_analysis || lexical_metrics) ? (
                         <>
                             <div className="flex-1 space-y-6 w-full">
-                                <MetricRow label="Lexical Density" value={lexical_analysis.vocabulary_richness} unit="%" limit={100} invertValue={true} description="The proportion of unique content words. A declining vocabulary richness over time may indicate early cognitive impairment." />
-                                <MetricRow label="Repetition Frequency" value={lexical_analysis.repetition_index} unit="%" limit={25} description="Frequency of repeating the exact same words or phrases. Increased repetition often correlates with working memory deficits." />
-                                <MetricRow label="Sentence Coherence Score" value={lexical_analysis.coherence_score} unit="/100" limit={100} invertValue={true} description="Measures logical flow and grammatical completeness. Sudden drops in coherence can be an early neural biomarker." />
+                                <MetricRow label="Lexical Density" value={lexical_metrics?.vocabulary_richness ?? 0} unit="%" limit={100} invertValue={true} description="The proportion of unique content words. A declining vocabulary richness over time may indicate early cognitive impairment." />
+                                <MetricRow label="Repetition Frequency" value={lexical_metrics?.repetition_tendency ?? 0} unit="%" limit={25} description="Frequency of repeating the exact same words or phrases. Increased repetition often correlates with working memory deficits." />
+                                <MetricRow label="Sentence Coherence Score" value={lexical_metrics?.sentence_coherence ?? 0} unit="/100" limit={100} invertValue={true} description="Measures logical flow and grammatical completeness. Sudden drops in coherence can be an early neural biomarker." />
                             </div>
                             <div className="bg-white border text-sm border-border rounded-lg p-5 flex-1 w-full text-foreground/80 leading-relaxed">
                                 <span className="font-semibold text-foreground block mb-2">Automated Analysis Summary</span>
-                                {lexical_analysis.summary}
+                                {lexical_analysis?.summary ?? `Cognitive concern level: ${lexical_metrics?.cognitive_concern ?? "Unknown"}. Word finding difficulty: ${((lexical_metrics?.word_finding_difficulty ?? 0) * 100).toFixed(0)}%.`}
                                 <br /><br />
                                 <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Lexical Pattern Observation Completed</span>
                             </div>
