@@ -28,7 +28,7 @@ logger = logging.getLogger("cognitive-echo.lexical")
 
 FEATHERLESS_API_URL = "https://api.featherless.ai/v1/chat/completions"
 FEATHERLESS_MODEL = "meta-llama/Meta-Llama-3-8B-Instruct"
-FEATHERLESS_TEMPERATURE = 0.2
+FEATHERLESS_TEMPERATURE = 0.4
 FEATHERLESS_MAX_TOKENS = 300
 REQUEST_TIMEOUT_SECONDS = 60.0
 MAX_RETRIES = 2
@@ -37,18 +37,19 @@ BASE_BACKOFF_SECONDS = 1.0
 # ─── System prompt ────────────────────────────────────────────────────────────
 
 _SYSTEM_PROMPT = (
-    "You are a clinical neurolinguistics expert. "
+    "You are a strict clinical neurolinguistics expert. "
     "Analyze the following speech transcript for cognitive-linguistic markers. "
-    "Evaluate ONLY the following dimensions and return a JSON object with "
-    "exactly these keys:\n"
+    "Evaluate ONLY the specific linguistic dimensions below based strictly on the source text.\n\n"
+    "CRITICAL: Do NOT default to generic scores like '0.1' or '0.2'. You MUST use the full floating-point scale (0.00 to 1.00) "
+    "to reflect subtle degrees of impairment or fluency accurately.\n\n"
+    "Return a JSON object with exactly these keys:\n"
+    '  "vocabulary_richness"      – float 0.00 to 1.00 (1.00 = highly sophisticated, diverse vocabulary)\n'
+    '  "sentence_coherence"       – float 0.00 to 1.00 (1.00 = perfectly logical, unbroken flow)\n'
+    '  "word_finding_difficulty"  – float 0.00 to 1.00 (1.00 = severe blocking, excessive fillers like "uh", substituting vague words)\n'
+    '  "repetition_tendency"      – float 0.00 to 1.00 (1.00 = highly repetitive loops or echoing)\n'
+    '  "cognitive_concern"        – string, strictly one of "Low", "Medium", or "High" depending on severity.\n'
     "\n"
-    '  "vocabulary_richness"      – float 0 to 1 (1 = highly diverse vocabulary)\n'
-    '  "sentence_coherence"       – float 0 to 1 (1 = perfectly coherent)\n'
-    '  "word_finding_difficulty"  – float 0 to 1 (1 = severe difficulty)\n'
-    '  "repetition_tendency"      – float 0 to 1 (1 = highly repetitive)\n'
-    '  "cognitive_concern"        – string, one of "Low", "Medium", or "High"\n'
-    "\n"
-    "Return ONLY valid JSON. No markdown, no explanation, no extra text."
+    "Return ONLY valid JSON. No markdown fences, no explanation, no extra text."
 )
 
 _USER_PROMPT_TEMPLATE = "Transcript:\n\n{transcript}"
