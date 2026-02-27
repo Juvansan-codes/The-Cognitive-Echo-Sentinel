@@ -9,6 +9,9 @@ from __future__ import annotations
 import logging
 import uuid
 from contextlib import asynccontextmanager
+from dotenv import load_dotenv
+
+load_dotenv()  # Load .env before any service imports
 
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,6 +21,7 @@ from app.models.schemas import (
     AcousticFeatures,
     BaselineComparison,
     LexicalAnalysis,
+    LexicalMetrics,
     RiskScores,
 )
 from app.services.audio_features import extract_features
@@ -25,8 +29,11 @@ from app.services.risk_engine import (
     compare_to_baseline,
     compute_acoustic_risk,
     compute_cognitive_risk,
+    compute_cognitive_score,
+    compute_final_neuro_risk,
     generate_explanation,
     lexical_analysis_placeholder,
+    run_lexical_analysis,
 )
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
@@ -107,17 +114,63 @@ async def analyze_audio(file: UploadFile = File(...)):
     acoustic_risk = compute_acoustic_risk(features, baseline)
     logger.info("Acoustic risk score: %.1f", acoustic_risk)
 
-    # 5. Lexical Analysis (placeholder)
+    # 5. Lexical Analysis (placeholder for dashboard compatibility)
     lexical = lexical_analysis_placeholder()
 
-    # 6. Cognitive Risk Score
-    risk = compute_cognitive_risk(acoustic_risk, lexical, baseline)
-    logger.info("Cognitive risk: %.1f – level: %s", risk["cognitive_risk_score"], risk["neuro_risk_level"])
+    # 5b. Featherless AI lexical analysis (async, with retry)
+    # NOTE: In production, transcript comes from Whisper. Using placeholder here.
+    transcript_placeholder = "This is a placeholder transcript for demonstration purposes."
+    lexical_result = await run_lexical_analysis(transcript_placeholder)
 
-    # 7. Explanation
+    # 6. Determine lexical availability
+    lexical_status = lexical_result.get("status", "unavailable")
+    cognitive_available = lexical_status == "success"
+
+    if cognitive_available:
+        logger.info("Lexical metrics: %s", lexical_result)
+        cognitive_score = compute_cognitive_score(lexical_result)
+        logger.info("Cognitive score (lexical): %.1f", cognitive_score)
+        lexical_metrics_obj = LexicalMetrics(
+            vocabulary_richness=lexical_result["vocabulary_richness"],
+            sentence_coherence=lexical_result["sentence_coherence"],
+            word_finding_difficulty=lexical_result["word_finding_difficulty"],
+            repetition_tendency=lexical_result["repetition_tendency"],
+            cognitive_concern=lexical_result["cognitive_concern"],
+        )
+        cognitive_concern = lexical_result.get("cognitive_concern")
+        lexical_error = None
+    else:
+        logger.warning(
+            "Lexical analysis unavailable (%s): %s",
+            lexical_result.get("error_type", "unknown"),
+            lexical_result.get("message", "No details"),
+        )
+        cognitive_score = None
+        lexical_metrics_obj = None
+        cognitive_concern = None
+        lexical_error = lexical_result.get("message")
+
+    # 7. Final Neuro Risk (acoustic + cognitive fusion, or acoustic-only)
+    risk = compute_final_neuro_risk(acoustic_risk, cognitive_score)
+    logger.info(
+        "Final neuro risk: level=%s, cognitive_available=%s",
+        risk["neuro_risk_level"], cognitive_available,
+    )
+
+    # 8. Explanation
     explanation, recommendations = generate_explanation(features, baseline, risk, lexical)
 
-    # 8. Build response
+    if not cognitive_available:
+        explanation += (
+            " Note: Lexical analysis was unavailable for this session. "
+            "Risk assessment is based on acoustic data only."
+        )
+        recommendations.append(
+            "Re-record and retry when the lexical analysis service is available "
+            "for a more comprehensive assessment."
+        )
+
+    # 9. Build response
     session_id = str(uuid.uuid4())
 
     return AnalysisResponse(
@@ -126,7 +179,12 @@ async def analyze_audio(file: UploadFile = File(...)):
         acoustic_features=AcousticFeatures(**features),
         baseline_comparison=BaselineComparison(**baseline),
         lexical_analysis=LexicalAnalysis(**lexical),
+        lexical_metrics=lexical_metrics_obj,
         risk_scores=RiskScores(**risk),
+        cognitive_available=cognitive_available,
+        lexical_status=lexical_status,
+        lexical_error_message=lexical_error,
+        cognitive_concern=cognitive_concern,
         explanation=explanation,
         recommendations=recommendations,
     )

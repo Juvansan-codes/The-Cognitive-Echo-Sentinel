@@ -4,14 +4,21 @@ Risk scoring engine for Cognitive Echo Sentinel.
 Performs:
   1. Vocal Twin baseline comparison (mock)
   2. Acoustic Risk Score computation
-  3. Placeholder LLM lexical analysis
-  4. Final Cognitive Risk Score aggregation
+  3. LLM-based lexical analysis (Featherless AI) with safe fallback
+  4. Cognitive Risk Score from lexical metrics
+  5. Final Neuro Risk Score (acoustic + cognitive fusion)
 """
 
 from __future__ import annotations
 
+import logging
 import math
 import random
+from typing import Any
+
+from app.services.lexical_analyzer import analyze_lexical_cognition
+
+logger = logging.getLogger("cognitive-echo.risk")
 
 
 # ─── Baseline Comparison (Vocal Twin) ────────────────────────────────────────
@@ -208,6 +215,147 @@ def generate_explanation(
         recs.append("Maintain a healthy lifestyle with adequate sleep and hydration.")
 
     return " ".join(parts), recs
+
+
+# ─── Featherless Lexical Analysis (async, reliability-aware) ─────────────────
+
+
+async def run_lexical_analysis(transcript: str) -> dict[str, Any]:
+    """
+    Call Featherless AI for lexical cognition analysis.
+
+    Returns a dict that ALWAYS includes a 'status' key:
+      - status='success': real LLM metrics are present
+      - status='unavailable': analysis could not be completed;
+        includes error_type and message instead of fake values
+
+    The API will never crash and will never fabricate medical data.
+    """
+    if not transcript or not transcript.strip():
+        logger.warning("Empty transcript – lexical analysis unavailable.")
+        return {
+            "status": "unavailable",
+            "error_type": "empty_transcript",
+            "message": "No transcript available for lexical analysis.",
+        }
+
+    try:
+        metrics = await analyze_lexical_cognition(transcript)
+        logger.info(
+            "Featherless lexical analysis succeeded – concern: %s",
+            metrics.get("cognitive_concern", "unknown"),
+        )
+        metrics["status"] = "success"
+        return metrics
+    except ValueError as exc:
+        logger.warning("Lexical analysis input error: %s", exc)
+        return {
+            "status": "unavailable",
+            "error_type": "input_validation",
+            "message": str(exc),
+        }
+    except RuntimeError as exc:
+        logger.warning("Featherless lexical analysis failed: %s", exc)
+        return {
+            "status": "unavailable",
+            "error_type": "api_failure",
+            "message": f"Lexical analysis could not be completed: {exc}",
+        }
+    except Exception as exc:
+        logger.error("Unexpected error in lexical analysis: %s", exc, exc_info=True)
+        return {
+            "status": "unavailable",
+            "error_type": "unexpected_error",
+            "message": "An unexpected error occurred during lexical analysis.",
+        }
+
+
+# ─── Cognitive Score from Lexical Metrics ─────────────────────────────────────
+
+def compute_cognitive_score(metrics: dict[str, Any]) -> float:
+    """
+    Compute a 0–100 cognitive score from Featherless lexical metrics.
+
+    Formula (each weight = 0.25):
+      - vocabulary_richness (higher is better          → lower risk)
+      - sentence_coherence  (higher is better          → lower risk)
+      - word_finding_difficulty (higher is worse        → inverted)
+      - repetition_tendency    (higher is worse         → inverted)
+
+    Score represents *health* (100 = best), then inverted to *risk*.
+    """
+    vocab = metrics.get("vocabulary_richness", 0.5)
+    coherence = metrics.get("sentence_coherence", 0.5)
+    word_diff = metrics.get("word_finding_difficulty", 0.5)
+    repetition = metrics.get("repetition_tendency", 0.5)
+
+    # Health score (0-1, 1 = healthy)
+    health = (
+        vocab * 0.25
+        + coherence * 0.25
+        + (1.0 - word_diff) * 0.25
+        + (1.0 - repetition) * 0.25
+    )
+
+    # Invert to risk (0-100, 100 = highest risk)
+    risk = (1.0 - health) * 100.0
+    return round(_clamp(risk), 1)
+
+
+# ─── Final Neuro Risk (Acoustic + Cognitive Fusion) ──────────────────────────
+
+def compute_final_neuro_risk(
+    acoustic_risk: float,
+    cognitive_score: float | None = None,
+) -> dict[str, Any]:
+    """
+    Fuse acoustic and cognitive scores into a single Neuro Risk indicator.
+
+    When cognitive_score is available:
+      final = acoustic * 0.6 + cognitive * 0.4
+
+    When cognitive_score is unavailable (None):
+      final = acoustic score only (no fabricated cognitive data)
+      cognitive_available = False
+    """
+    cognitive_available = cognitive_score is not None
+
+    if cognitive_available:
+        final_score = round(
+            acoustic_risk * 0.6 + cognitive_score * 0.4,
+            1,
+        )
+    else:
+        # Acoustic-only mode – do not fabricate cognitive values
+        final_score = round(acoustic_risk, 1)
+        logger.warning(
+            "Cognitive score unavailable – neuro risk based on acoustic data only."
+        )
+
+    final_score = _clamp(final_score)
+
+    level = (
+        "Low" if final_score < 30
+        else "Medium" if final_score < 60
+        else "High"
+    )
+
+    # Confidence is lower when cognitive data is missing
+    base_confidence = 0.85 if cognitive_available else 0.65
+    confidence = round(
+        max(0.3, min(0.95, base_confidence - abs(final_score - 50) * 0.005 + random.uniform(-0.05, 0.05))),
+        2,
+    )
+
+    result: dict[str, Any] = {
+        "acoustic_risk_score": acoustic_risk,
+        "cognitive_risk_score": round(cognitive_score, 1) if cognitive_available else None,
+        "neuro_risk_level": level,
+        "confidence": confidence,
+        "cognitive_available": cognitive_available,
+    }
+
+    return result
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────

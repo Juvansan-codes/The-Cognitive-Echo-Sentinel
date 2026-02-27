@@ -3,7 +3,7 @@ Pydantic models for Cognitive Echo Sentinel API.
 """
 
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Any, Optional
 
 
 class AcousticFeatures(BaseModel):
@@ -40,13 +40,24 @@ class LexicalAnalysis(BaseModel):
     summary: str = Field(description="Brief AI-generated narrative")
 
 
+class LexicalMetrics(BaseModel):
+    """Featherless AI cognitive-linguistic analysis metrics."""
+
+    vocabulary_richness: float = Field(description="Lexical diversity (0-1)")
+    sentence_coherence: float = Field(description="Semantic coherence (0-1)")
+    word_finding_difficulty: float = Field(description="Word retrieval difficulty (0-1)")
+    repetition_tendency: float = Field(description="Repetition frequency (0-1)")
+    cognitive_concern: str = Field(description="Low | Medium | High")
+
+
 class RiskScores(BaseModel):
     """Computed risk indicators."""
 
     acoustic_risk_score: float = Field(description="Acoustic risk (0-100)")
-    cognitive_risk_score: float = Field(description="Cognitive risk (0-100)")
+    cognitive_risk_score: Optional[float] = Field(default=None, description="Cognitive risk (0-100), None if unavailable")
     neuro_risk_level: str = Field(description="Low | Medium | High")
     confidence: float = Field(description="Model confidence (0-1)")
+    cognitive_available: bool = Field(default=True, description="Whether cognitive scoring was available")
 
 
 class AnalysisResponse(BaseModel):
@@ -57,6 +68,11 @@ class AnalysisResponse(BaseModel):
     acoustic_features: AcousticFeatures
     baseline_comparison: BaselineComparison
     lexical_analysis: LexicalAnalysis
+    lexical_metrics: Optional[LexicalMetrics] = Field(default=None, description="Featherless AI lexical analysis (None if unavailable)")
     risk_scores: RiskScores
+    cognitive_available: bool = Field(default=True, description="Whether cognitive/lexical analysis was completed")
+    lexical_status: str = Field(default="success", description="success | unavailable")
+    lexical_error_message: Optional[str] = Field(default=None, description="Error details if lexical analysis failed")
+    cognitive_concern: Optional[str] = Field(default=None, description="LLM cognitive concern level")
     explanation: str = Field(description="Human-readable AI summary of findings")
     recommendations: list[str] = Field(description="Actionable follow-up suggestions")
