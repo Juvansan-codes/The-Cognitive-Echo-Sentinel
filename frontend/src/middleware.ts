@@ -4,6 +4,7 @@ import type { NextRequest } from 'next/server';
 // Protected routes require authentication
 const protectedRoutes = ['/dashboard', '/history', '/settings', '/assessment'];
 const authRoutes = ['/login', '/register'];
+const publicRoutes = ['/admin'];
 
 export function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
@@ -13,6 +14,12 @@ export function middleware(request: NextRequest) {
 
     const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
     const isAuthRoute = authRoutes.some(route => pathname.startsWith(route));
+    const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route));
+
+    // Allow public routes (e.g. /admin) without auth
+    if (isPublicRoute) {
+        return NextResponse.next();
+    }
 
     // Redirect to login if accessing a protected route without a token
     if (isProtectedRoute && !hasToken) {

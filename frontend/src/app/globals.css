@@ -119,3 +119,116 @@
   background: #D0D5DD;
   border-radius: 3px;
 }
+
+/* ─── EchoCare Chatbot Animations ─── */
+
+@keyframes chatbot-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes chatbot-slide-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+}
+
+@keyframes chatbot-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes chatbot-bounce {
+
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+  }
+
+  30% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes chatbot-breathe {
+
+  0%,
+  100% {
+    box-shadow: 0 4px 20px rgba(46, 91, 255, 0.35);
+  }
+
+  50% {
+    box-shadow: 0 4px 28px rgba(46, 91, 255, 0.55);
+  }
+}
+
+@keyframes chatbot-entrance {
+  from {
+    opacity: 0;
+    transform: scale(0) rotate(-45deg);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.chatbot-slide-in {
+  animation: chatbot-slide-in 300ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.chatbot-slide-out {
+  animation: chatbot-slide-out 250ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.chatbot-fade-in {
+  animation: chatbot-fade-in 350ms ease-out forwards;
+}
+
+.chatbot-bounce {
+  animation: chatbot-bounce 1.2s ease-in-out infinite;
+}
+
+.chatbot-breathe {
+  animation: chatbot-breathe 3s ease-in-out infinite;
+}
+
+.chatbot-entrance {
+  animation: chatbot-entrance 500ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Scroll shadow for chat body */
+.chatbot-scroll-shadow {
+  mask-image: linear-gradient(to bottom,
+      transparent 0px,
+      black 12px,
+      black calc(100% - 12px),
+      transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom,
+      transparent 0px,
+      black 12px,
+      black calc(100% - 12px),
+      transparent 100%);
+}
