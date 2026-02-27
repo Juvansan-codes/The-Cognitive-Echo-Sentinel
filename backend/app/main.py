@@ -141,16 +141,14 @@ async def analyze_audio(file: UploadFile = File(...)):
     acoustic_risk = compute_acoustic_risk(features, baseline)
     logger.info("Acoustic risk score: %.1f", acoustic_risk)
 
-    # 5b. Featherless AI lexical analysis (async, with retry)
-    # NOTE: In production, transcript comes from Whisper. Using realistic phonetic passage here.
-    transcript_placeholder = (
-        "You wish to know all about my grandfather. Well, he is nearly ninety-"
-        "three years old; he dresses himself in an ancient black frock coat, "
-        "usually minus several buttons; yet he still thinks as swiftly as ever. "
-        "A long, flowing beard clings to his chin, giving those who observe him "
-        "a pronounced feeling of the utmost respect."
-    )
-    lexical_result = await run_lexical_analysis(transcript_placeholder)
+    # 5b. Groq Whisper STT -> Featherless AI lexical analysis
+    from app.services.transcription import transcribe_audio
+
+    transcript = await transcribe_audio(audio_bytes)
+    if transcript:
+        lexical_result = await run_lexical_analysis(transcript)
+    else:
+        lexical_result = {"status": "unavailable", "cognitive_concern": "Unknown"}
 
     # 6. Determine lexical availability
     lexical_status = lexical_result.get("status", "unavailable")
