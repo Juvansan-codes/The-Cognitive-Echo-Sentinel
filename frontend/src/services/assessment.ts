@@ -25,9 +25,12 @@ function toRiskLevel(level: string): "Low" | "Medium" | "High" {
 
 // ─── Submit Audio — calls FastAPI, then saves to Supabase non-blockingly ───
 
-export async function submitAudioSimulation(blob: Blob | File): Promise<AnalysisResponse> {
+export async function submitAudioSimulation(
+    blob: Blob | File,
+    mode: "guided" | "free_speech"
+): Promise<AnalysisResponse> {
     // 1. Call the real FastAPI backend
-    const result = await analyzeAudio(blob);
+    const result = await analyzeAudio(blob, mode);
 
     // 2. Fire-and-forget: persist to Supabase (never blocks or crashes the UI)
     void (async () => {

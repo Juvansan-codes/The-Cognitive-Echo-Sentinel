@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 
 load_dotenv()  # Load .env before any service imports
 
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.models.schemas import (
@@ -108,12 +108,16 @@ async def health():
 # ─── Main Analysis Endpoint ──────────────────────────────────────────────────
 
 @app.post("/api/analyze", response_model=AnalysisResponse)
-async def analyze_audio(file: UploadFile = File(...)):
+async def analyze_audio(
+    file: UploadFile = File(...),
+    mode: str = Form("free_speech") # Literal["guided", "free_speech"] passed via Form
+):
     """
-    Accept an audio file, run the full analysis pipeline, and return
-    structured risk assessment data.
+    Accept an audio file and an analysis mode.
+    Run the full pipeline (STT + Lexical + Acoustic) if mode="free_speech".
+    Run only the acoustic pipeline if mode="guided".
     """
-    logger.info("Received audio file: %s (%s)", file.filename, file.content_type)
+    logger.info("Received audio file: %s (%s) [Mode: %s]", file.filename, file.content_type, mode)
 
     # 1. Read audio bytes
     try:
@@ -141,14 +145,21 @@ async def analyze_audio(file: UploadFile = File(...)):
     acoustic_risk = compute_acoustic_risk(features, baseline)
     logger.info("Acoustic risk score: %.1f", acoustic_risk)
 
-    # 5b. Groq Whisper STT -> Featherless AI lexical analysis
-    from app.services.transcription import transcribe_audio
-
-    transcript = await transcribe_audio(audio_bytes)
-    if transcript:
-        lexical_result = await run_lexical_analysis(transcript)
+    # 5. Lexical Pipeline (Conditional)
+    lexical_result = None
+    
+    if mode == "free_speech":
+        # 5b. Groq Whisper STT -> Featherless AI lexical analysis
+        from app.services.transcription import transcribe_audio
+        transcript = await transcribe_audio(audio_bytes)
+        
+        if transcript:
+            lexical_result = await run_lexical_analysis(transcript)
+        else:
+            lexical_result = {"status": "unavailable", "cognitive_concern": "Unknown"}
     else:
-        lexical_result = {"status": "unavailable", "cognitive_concern": "Unknown"}
+        logger.info("Skipping Lexical Analysis (mode=%s)", mode)
+        lexical_result = {"status": "skipped", "cognitive_concern": "Unknown"}
 
     # 6. Determine lexical availability
     lexical_status = lexical_result.get("status", "unavailable")
