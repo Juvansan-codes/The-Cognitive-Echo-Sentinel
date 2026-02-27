@@ -48,6 +48,33 @@ logger = logging.getLogger("cognitive-echo")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("🧠 Cognitive Echo Sentinel backend starting…")
+
+    # ── Audio Pipeline Status ──
+    from app.services.audio_features import LIBROSA_AVAILABLE, PRAAT_AVAILABLE
+    if LIBROSA_AVAILABLE:
+        logger.info("✅ AUDIO_PIPELINE=REAL (librosa loaded)")
+    else:
+        logger.warning("⚠️ AUDIO_PIPELINE=MOCK (librosa missing)")
+    if PRAAT_AVAILABLE:
+        logger.info("✅ PRAAT_PIPELINE=REAL (parselmouth loaded)")
+    else:
+        logger.warning("⚠️ PRAAT_PIPELINE=MOCK (parselmouth missing)")
+
+    # ── ML Model Status ──
+    from app.services.risk_engine import _ml_ready
+    if _ml_ready:
+        logger.info("✅ ML_MODEL=LOADED (neuro_risk_model.pkl)")
+    else:
+        logger.warning("⚠️ ML_MODEL=HEURISTIC_FALLBACK (model not loaded)")
+
+    # ── LLM API Key Status ──
+    import os
+    if os.getenv("FEATHERLESS_API_KEY"):
+        logger.info("✅ FEATHERLESS_API_KEY=CONFIGURED")
+    else:
+        logger.warning("⚠️ FEATHERLESS_API_KEY=MISSING (lexical analysis will fail)")
+
+    logger.info("🚀 Backend ready for requests")
     yield
     logger.info("Shutting down…")
 
