@@ -62,6 +62,8 @@ export async function analyzeAudio(audioBlob: Blob): Promise<AnalysisResponse> {
     const formData = new FormData();
     formData.append("file", audioBlob, "recording.webm");
 
+    console.log("POST →", `${API_BASE}/api/analyze`);
+
     const response = await fetch(`${API_BASE}/api/analyze`, {
         method: "POST",
         body: formData,
