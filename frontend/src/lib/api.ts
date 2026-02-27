@@ -41,12 +41,21 @@ export interface RiskScores {
     confidence?: number | null;
 }
 
+export interface LexicalMetrics {
+    vocabulary_richness: number;
+    sentence_coherence: number;
+    word_finding_difficulty: number;
+    repetition_tendency: number;
+    cognitive_concern: string;
+}
+
 export interface AnalysisResponse {
     session_id: string;
     duration_seconds: number;
     acoustic_features: AcousticFeatures;
     baseline_comparison: BaselineComparison;
     lexical_analysis?: LexicalAnalysis | null;
+    lexical_metrics?: LexicalMetrics | null;
     risk_scores: RiskScores;
     explanation: string;
     recommendations: string[];
@@ -54,15 +63,20 @@ export interface AnalysisResponse {
     cognitive_available?: boolean;
     lexical_status?: string;
     lexical_error_message?: string | null;
+    cognitive_concern?: string | null;
 }
 
 // ─── API Functions ───────────────────────────────────────────────────────────
 
-export async function analyzeAudio(audioBlob: Blob): Promise<AnalysisResponse> {
+export async function analyzeAudio(
+    audioBlob: Blob,
+    mode: "guided" | "free_speech" = "guided"
+): Promise<AnalysisResponse> {
     const formData = new FormData();
     formData.append("file", audioBlob, "recording.webm");
+    formData.append("mode", mode);
 
-    console.log("POST →", `${API_BASE}/api/analyze`);
+    console.log("POST →", `${API_BASE}/api/analyze`, "[mode:", mode, "]");
 
     const response = await fetch(`${API_BASE}/api/analyze`, {
         method: "POST",
