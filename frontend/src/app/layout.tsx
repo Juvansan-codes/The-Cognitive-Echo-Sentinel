@@ -26,7 +26,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="light">
       <body className={`${inter.variable} font-sans antialiased bg-background text-foreground selection:bg-primary/20`}>
         {children}
       </body>
