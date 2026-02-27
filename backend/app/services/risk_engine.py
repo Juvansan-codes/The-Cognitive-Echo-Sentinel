@@ -3,7 +3,7 @@ Risk scoring engine for Cognitive Echo Sentinel.
 
 Performs:
   1. Vocal Twin baseline comparison (mock)
-  2. Acoustic Risk Score computation
+  2. Acoustic Risk Score computation (ML-driven with heuristic fallback)
   3. LLM-based lexical analysis (Featherless AI) with safe fallback
   4. Cognitive Risk Score from lexical metrics
   5. Final Neuro Risk Score (acoustic + cognitive fusion)
@@ -14,11 +14,52 @@ from __future__ import annotations
 import logging
 import math
 import random
+from pathlib import Path
 from typing import Any
+
+import numpy as np
 
 from app.services.lexical_analyzer import analyze_lexical_cognition
 
 logger = logging.getLogger("cognitive-echo.risk")
+
+# ─── ML Model Loading (once at import time) ──────────────────────────────────
+
+_MODEL_DIR = Path(__file__).resolve().parent.parent / "models"
+
+_ml_model = None
+_ml_scaler = None
+_ml_label_encoder = None
+_ml_feature_names: list[str] = []
+_ml_ready = False
+
+try:
+    import joblib
+
+    _model_path = _MODEL_DIR / "neuro_risk_model.pkl"
+    _scaler_path = _MODEL_DIR / "scaler.pkl"
+    _encoder_path = _MODEL_DIR / "label_encoder.pkl"
+    _features_path = _MODEL_DIR / "feature_names.pkl"
+
+    if _model_path.exists() and _scaler_path.exists():
+        _ml_model = joblib.load(_model_path)
+        _ml_scaler = joblib.load(_scaler_path)
+        if _encoder_path.exists():
+            _ml_label_encoder = joblib.load(_encoder_path)
+        if _features_path.exists():
+            _ml_feature_names = joblib.load(_features_path)
+        _ml_ready = True
+        logger.info(
+            "ML model loaded successfully (%d features, classes=%s)",
+            len(_ml_feature_names),
+            list(_ml_label_encoder.classes_) if _ml_label_encoder else "unknown",
+        )
+    else:
+        logger.warning(
+            "ML model files not found in %s – using heuristic scoring.", _MODEL_DIR
+        )
+except Exception as exc:
+    logger.warning("Failed to load ML model – falling back to heuristic: %s", exc)
 
 
 # ─── Baseline Comparison (Vocal Twin) ────────────────────────────────────────
@@ -60,11 +101,201 @@ def compare_to_baseline(features: dict) -> dict:
     }
 
 
+# ─── ML-Based Acoustic Risk ──────────────────────────────────────────────────
+
+def build_model_feature_vector(features: dict) -> np.ndarray:
+    """
+    Map live-extracted acoustic features to the model's expected 28-feature input.
+
+    The trained Parkinson model expects features derived from standard voice
+    analysis.  Non-extractable features (subject ID, UPDRS) are set to the
+    global training-set mean so the model relies on real acoustic signals.
+
+    Feature mapping (from Parkinson Multiple Sound Recording dataset):
+        f0:  Subject ID          →  global mean (20.5)
+        f1–f5:  Jitter variants
+        f6–f11: Shimmer variants
+        f12: Autocorrelation     →  pitch stability
+        f13: Noise-to-harmonics  →  1/HNR
+        f14: Harmonics-to-noise  →  HNR
+        f15–f19: Pitch statistics
+        f20–f21: Pulse / period counts
+        f22–f23: Period mean / std
+        f24: Fraction unvoiced   →  pause ratio (%)
+        f25–f26: Voice breaks
+        f27: UPDRS motor score   →  global mean (13.0)
+    """
+    jitter = features.get("jitter_percent", 1.5)
+    shimmer = features.get("shimmer_percent", 4.0)
+    pitch_mean = features.get("mean_pitch_hz", 150.0)
+    pitch_std = features.get("pitch_std_hz", 10.0)
+    stability = features.get("pitch_stability", 0.8)
+    pause = features.get("pause_ratio", 0.15)
+    hnr = features.get("harmonics_to_noise", 20.0)
+    speech_rate = features.get("speech_rate", 3.5)
+
+    # Derived values
+    jitter_abs = jitter / 100.0 * (1.0 / max(pitch_mean, 1.0))
+    period_mean = 1.0 / max(pitch_mean, 1.0)
+    period_std = pitch_std / max(pitch_mean ** 2, 1.0)
+    n_pulses = max(10, int(speech_rate * 30))
+    pitch_min = max(50.0, pitch_mean - 2 * pitch_std)
+    pitch_max = pitch_mean + 2 * pitch_std
+
+    # Shimmer in this dataset is much larger scale (~13 mean)
+    shimmer_scaled = shimmer * 3.0
+
+    vec = np.array([
+        20.5,                                    # f0:  Subject ID (global mean)
+        jitter,                                  # f1:  Jitter(%)
+        jitter_abs,                              # f2:  Jitter(Abs)
+        jitter * 0.5,                            # f3:  Jitter:RAP
+        jitter * 0.5,                            # f4:  Jitter:PPQ5
+        jitter * 1.4,                            # f5:  Jitter:DDP
+        shimmer_scaled,                          # f6:  Shimmer
+        shimmer * 0.30,                          # f7:  Shimmer(dB)
+        shimmer_scaled * 0.44,                   # f8:  Shimmer:APQ3
+        shimmer_scaled * 0.62,                   # f9:  Shimmer:APQ5
+        shimmer_scaled * 0.95,                   # f10: Shimmer:APQ11
+        shimmer_scaled * 1.32,                   # f11: Shimmer:DDA
+        stability,                               # f12: AC (autocorrelation)
+        max(0.01, 1.0 / (hnr + 0.01)),          # f13: NTH
+        hnr,                                     # f14: HTN (harmonics-to-noise)
+        pitch_mean,                              # f15: Median pitch
+        pitch_mean,                              # f16: Mean pitch
+        pitch_std,                               # f17: StdDev pitch
+        pitch_min,                               # f18: Min pitch
+        pitch_max,                               # f19: Max pitch
+        float(n_pulses),                         # f20: Number of pulses
+        float(max(1, n_pulses - 4)),             # f21: Number of periods
+        period_mean,                             # f22: Mean period
+        period_std,                              # f23: StdDev period
+        pause * 100.0,                           # f24: Fraction unvoiced (%)
+        max(0.0, (pause - 0.1) * 10),           # f25: Number of voice breaks
+        max(0.0, (pause - 0.1) * 80),           # f26: Degree of voice breaks
+        13.0,                                    # f27: UPDRS (global mean)
+    ], dtype=np.float64)
+
+    # Safety: replace NaN / Inf with 0
+    vec = np.nan_to_num(vec, nan=0.0, posinf=0.0, neginf=0.0)
+    return vec
+
+
+def predict_acoustic_risk(feature_vector: list[float] | np.ndarray) -> tuple[str, float]:
+    """
+    Run ML inference on an acoustic feature vector.
+
+    Returns:
+        (predicted_label, confidence) where confidence is the max
+        class probability from predict_proba.
+
+    Raises RuntimeError if the model is not loaded.
+    """
+    if not _ml_ready or _ml_model is None:
+        raise RuntimeError("ML model not loaded.")
+
+    X = np.asarray(feature_vector, dtype=np.float64).reshape(1, -1)
+
+    expected = len(_ml_feature_names) if _ml_feature_names else X.shape[1]
+    if X.shape[1] != expected:
+        raise ValueError(
+            f"Feature length mismatch: got {X.shape[1]}, expected {expected}"
+        )
+
+    # Safety: replace NaN / Inf
+    X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
+
+    # Predict
+    pred_encoded = _ml_model.predict(X)[0]
+    proba = _ml_model.predict_proba(X)[0]
+    confidence = float(np.max(proba))
+
+    # Decode label
+    if _ml_label_encoder is not None:
+        label = str(_ml_label_encoder.inverse_transform([pred_encoded])[0])
+    else:
+        label = str(pred_encoded)
+
+    logger.info(
+        "ML prediction: label=%s, confidence=%.3f, vector_len=%d",
+        label, confidence, X.shape[1],
+    )
+    return label, confidence
+
+
+def _probability_to_risk(proba_at_risk: float) -> float:
+    """
+    Convert the model's at-risk class probability to a 0–100 risk score.
+
+    Maps probability through a sigmoid-like curve for clinical sensitivity:
+      prob < 0.3  → low risk  (0–20)
+      prob ~ 0.5  → moderate  (35–50)
+      prob > 0.7  → high risk (60–95)
+    """
+    # Sigmoid stretch centred at 0.5
+    x = (proba_at_risk - 0.5) * 6.0
+    score = 100.0 / (1.0 + math.exp(-x))
+    return round(_clamp(score), 1)
+
+
 # ─── Acoustic Risk Score ─────────────────────────────────────────────────────
 
 def compute_acoustic_risk(features: dict, baseline: dict) -> float:
     """
-    Weighted score combining voice quality metrics.
+    Compute acoustic risk score (0–100).
+
+    Strategy:
+      1. Always compute the feature-driven heuristic score.
+      2. If ML model is available, compute ML risk probability.
+      3. Final score = weighted blend (40% ML + 60% heuristic).
+      4. On ML failure, use heuristic only.
+    """
+    heuristic_score = _heuristic_acoustic_risk(features, baseline)
+
+    # ── Attempt ML blend ──────────────────────────────────────────────
+    if _ml_ready:
+        try:
+            vec = build_model_feature_vector(features)
+            X = np.asarray(vec, dtype=np.float64).reshape(1, -1)
+            X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
+
+            proba = _ml_model.predict_proba(X)[0]
+            pred_encoded = _ml_model.predict(X)[0]
+
+            # Decode label for logging
+            if _ml_label_encoder is not None:
+                label = str(_ml_label_encoder.inverse_transform([pred_encoded])[0])
+            else:
+                label = str(pred_encoded)
+
+            # At-risk class probability (class "1" / "parkinson")
+            at_risk_idx = 1 if len(proba) > 1 else 0
+            prob_at_risk = float(proba[at_risk_idx])
+            ml_score = _probability_to_risk(prob_at_risk)
+
+            # Blend: 40% ML + 60% heuristic
+            blended = round(_clamp(ml_score * 0.40 + heuristic_score * 0.60), 1)
+
+            logger.info(
+                "Acoustic risk: ML=%.1f (label=%s, prob=%.3f) | "
+                "Heuristic=%.1f | Blended=%.1f",
+                ml_score, label, prob_at_risk, heuristic_score, blended,
+            )
+            return blended
+
+        except Exception as exc:
+            logger.warning(
+                "ML inference failed – using heuristic only: %s", exc
+            )
+
+    # ── Heuristic fallback ────────────────────────────────────────────
+    logger.info("Acoustic risk (heuristic only): %.1f", heuristic_score)
+    return heuristic_score
+
+
+def _heuristic_acoustic_risk(features: dict, baseline: dict) -> float:
+    """
+    Original weighted heuristic scoring (used as fallback).
 
     Returns 0-100 where higher = higher risk.
     """
@@ -74,7 +305,6 @@ def compute_acoustic_risk(features: dict, baseline: dict) -> float:
     hnr_risk = max(0, 100 - features.get("harmonics_to_noise", 20) * 4)
     baseline_risk = baseline.get("deviation_score", 25)
 
-    # Weighted combination
     risk = (
         jitter_score * 0.20
         + shimmer_score * 0.15
@@ -82,6 +312,7 @@ def compute_acoustic_risk(features: dict, baseline: dict) -> float:
         + hnr_risk * 0.15
         + baseline_risk * 0.30
     )
+    logger.info("Acoustic risk (heuristic fallback): %.1f", risk)
     return round(_clamp(risk), 1)
 
 
