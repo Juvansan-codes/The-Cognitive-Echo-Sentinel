@@ -1,18 +1,14 @@
-# ─── Railway Deployment Hardening ─────────────────────────────────────────────
-# praat-parselmouth (imported as parselmouth) enables jitter/shimmer extraction.
-# soundfile and numba are required by librosa to decode audio and run fast math.
-# Without these, the backend will fail to extract real features and silently 
-# fall back to the mock heuristic engine in production.
-
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 python-multipart==0.0.20
 pydantic==2.10.4
-numpy==2.2.2
-scipy==1.15.1
-librosa==0.10.2.post1
+
+numpy==1.26.4
+scipy==1.11.4
+numba==0.59.1
+librosa==0.10.1
 soundfile==0.12.1
-numba==0.60.0
 praat-parselmouth==0.4.3
+
 scikit-learn==1.6.1
 python-dotenv==1.0.1
