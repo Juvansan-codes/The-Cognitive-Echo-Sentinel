@@ -12,6 +12,10 @@ import logging
 import math
 import random
 import uuid
+import subprocess
+import tempfile
+import os
+from pathlib import Path
 
 import numpy as np
 
@@ -68,16 +72,59 @@ def extract_features(audio_bytes: bytes, sample_rate: int = 16_000) -> dict:
 # Real extraction (when libs available)
 # ---------------------------------------------------------------------------
 
+def convert_webm_to_wav(input_path: str) -> str:
+    """
+    Convert WebM/Opus audio to WAV using FFmpeg.
+    Returns path to WAV file.
+    """
+    output_path = str(Path(input_path).with_suffix(".wav"))
+
+    try:
+        process = subprocess.run(
+            ["ffmpeg", "-y", "-i", input_path, output_path],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        logger.info("🎧 Converted WebM → WAV successfully")
+        return output_path
+
+    except subprocess.CalledProcessError as e:
+        logger.error(f"❌ FFmpeg conversion failed with exit code {e.returncode}. Stderr: {e.stderr}")
+        return input_path
+    except Exception as e:
+        logger.error(f"❌ FFmpeg conversion crashed: {e}")
+        return input_path
+
 def _extract_real(audio_bytes: bytes, sr: int) -> dict:
     """Extract features using librosa + parselmouth."""
 
-    # Load audio
-    # Load audio
+    # 1. Safely handle WebM → WAV conversion
+    # Create a temporary WebM file for ffmpeg
+    with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp_webm:
+        tmp_webm.write(audio_bytes)
+        webm_path = tmp_webm.name
+
     try:
-        y, sr = librosa.load(io.BytesIO(audio_bytes), sr=sr, mono=True)
-    except Exception as e:
-        logger.error("MOCK_AUDIO_PIPELINE_ACTIVE: librosa failed to decode audio format (%s). WebM Opus requires system FFmpeg. Falling back to mock acoustics.", e)
-        return _extract_mock()
+        # Convert it
+        wav_path = convert_webm_to_wav(webm_path)
+        
+        # Load audio from the converted WAV file
+        try:
+            y, sr = librosa.load(wav_path, sr=sr, mono=True)
+        except Exception as e:
+            logger.error("MOCK_AUDIO_PIPELINE_ACTIVE: librosa failed to decode audio format (%s). WebM Opus requires system FFmpeg. Falling back to mock acoustics.", e)
+            return _extract_mock()
+            
+    finally:
+        # Cleanup temporary audio files
+        try:
+            os.remove(webm_path)
+            if 'wav_path' in locals() and wav_path != webm_path and os.path.exists(wav_path):
+                os.remove(wav_path)
+        except Exception:
+            pass
         
     duration = librosa.get_duration(y=y, sr=sr)
 

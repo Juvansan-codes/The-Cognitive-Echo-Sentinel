@@ -14,5 +14,6 @@ scikit-learn==1.6.1
 python-dotenv==1.0.1
 setuptools>=65.0.0
 wheel
+audioread>=3.0.1
 joblib==1.4.2
 httpx==0.28.1
