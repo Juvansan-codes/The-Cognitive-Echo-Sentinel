@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Mic, Square, Loader2 } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Mic, Square, Loader2, UploadCloud, Clock, Activity } from "lucide-react";
 
 export type RecordingState = "idle" | "recording" | "processing";
 
@@ -24,6 +24,7 @@ export function AudioRecorder({
     const analyserRef = useRef<AnalyserNode | null>(null);
     const animFrameRef = useRef<number>(0);
     const streamRef = useRef<MediaStream | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const [duration, setDuration] = useState(0);
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -43,11 +44,11 @@ export function AudioRecorder({
             animFrameRef.current = requestAnimationFrame(draw);
             analyser.getByteTimeDomainData(dataArray);
 
-            ctx.fillStyle = "rgba(18, 18, 28, 0.3)";
+            ctx.fillStyle = "#F5F7F9";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             // Draw center line
-            ctx.strokeStyle = "rgba(100, 200, 220, 0.1)";
+            ctx.strokeStyle = "#E4E7EC";
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(0, canvas.height / 2);
@@ -55,13 +56,8 @@ export function AudioRecorder({
             ctx.stroke();
 
             // Draw waveform
-            const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
-            gradient.addColorStop(0, "#22d3ee");
-            gradient.addColorStop(0.5, "#818cf8");
-            gradient.addColorStop(1, "#22d3ee");
-
-            ctx.lineWidth = 2.5;
-            ctx.strokeStyle = gradient;
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "#2E5BFF"; // Primary Medical Blue
             ctx.beginPath();
 
             const sliceWidth = canvas.width / bufferLength;
@@ -79,12 +75,6 @@ export function AudioRecorder({
 
             ctx.lineTo(canvas.width, canvas.height / 2);
             ctx.stroke();
-
-            // Glow effect
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = "#22d3ee";
-            ctx.stroke();
-            ctx.shadowBlur = 0;
         };
 
         draw();
@@ -95,7 +85,6 @@ export function AudioRecorder({
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             streamRef.current = stream;
 
-            // Set up analyser for waveform
             const audioCtx = new AudioContext();
             const source = audioCtx.createMediaStreamSource(stream);
             const analyser = audioCtx.createAnalyser();
@@ -103,7 +92,6 @@ export function AudioRecorder({
             source.connect(analyser);
             analyserRef.current = analyser;
 
-            // Set up MediaRecorder
             const mediaRecorder = new MediaRecorder(stream, {
                 mimeType: MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
                     ? "audio/webm;codecs=opus"
@@ -142,7 +130,13 @@ export function AudioRecorder({
         onStateChange("processing");
     }, [onStateChange]);
 
-    // Cleanup on unmount
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        onStateChange("processing");
+        onRecordingComplete(file);
+    };
+
     useEffect(() => {
         return () => {
             cancelAnimationFrame(animFrameRef.current);
@@ -157,74 +151,100 @@ export function AudioRecorder({
             .padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
 
     return (
-        <Card className="glass-card border-border/30" id="recorder-card">
-            <CardContent className="p-6 md:p-8">
-                <div className="flex flex-col items-center gap-6">
-                    {/* Status text */}
-                    <div className="text-center">
-                        <h2 className="text-xl font-semibold mb-1">
-                            {state === "idle" && "Ready to Record"}
-                            {state === "recording" && "Recording…"}
-                            {state === "processing" && "Analyzing Voice Sample…"}
-                        </h2>
-                        <p className="text-sm text-muted-foreground">
-                            {state === "idle" &&
-                                "Click the microphone to begin a voice sample recording."}
-                            {state === "recording" &&
-                                `Duration: ${formatTime(duration)} — Click stop when finished.`}
-                            {state === "processing" &&
-                                "Processing your audio through the analysis pipeline."}
-                        </p>
+        <Card className="border border-border bg-card shadow-sm" id="recorder-card">
+            <CardHeader className="pb-4 border-b border-border/50">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                        <Mic className="w-4 h-4 text-primary" />
+                    </div>
+                    <div>
+                        <CardTitle className="text-base text-foreground font-semibold">Voice Sample Acquisition</CardTitle>
+                        <CardDescription className="text-xs">Acoustic marker collection</CardDescription>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent className="p-6">
+                <div className="flex flex-col gap-6">
+                    {/* Status Info Row */}
+                    <div className="flex justify-between items-center text-xs font-medium bg-white rounded-md border border-border px-3 py-2">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>Duration Limit: 2min</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-emerald-600">
+                            <Activity className="w-3.5 h-3.5" />
+                            <span>Baseline Active</span>
+                        </div>
                     </div>
 
-                    {/* Waveform canvas */}
-                    <div className="w-full relative rounded-xl overflow-hidden border border-border/20 bg-slate-950/50">
+                    {/* Waveform Canvas */}
+                    <div className="w-full relative rounded-lg overflow-hidden border border-border bg-white h-24 flex items-center justify-center">
                         <canvas
                             ref={canvasRef}
                             width={800}
-                            height={120}
-                            className="w-full h-[120px]"
+                            height={96}
+                            className="w-full h-24"
                         />
                         {state === "idle" && (
-                            <div className="absolute inset-0 flex items-center justify-center">
-                                <span className="text-muted-foreground/40 text-sm tracking-widest uppercase">
-                                    Waveform Preview
+                            <div className="absolute inset-0 flex items-center justify-center bg-card">
+                                <span className="text-muted-foreground text-xs uppercase tracking-widest font-medium">
+                                    Awaiting Audio Input
                                 </span>
+                            </div>
+                        )}
+                        {state === "processing" && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-card/80 backdrop-blur-sm gap-2">
+                                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                                <span className="text-sm font-medium text-foreground">Processing Biomarkers...</span>
                             </div>
                         )}
                     </div>
 
-                    {/* Record / Stop button */}
-                    <div className="flex items-center gap-4">
-                        {state === "idle" && (
-                            <Button
-                                size="lg"
-                                onClick={startRecording}
-                                className="rounded-full w-16 h-16 p-0 bg-gradient-to-br from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 shadow-lg shadow-cyan-500/25 transition-all hover:scale-105 hover:shadow-cyan-500/40"
-                                id="start-recording-btn"
-                            >
-                                <Mic className="w-7 h-7 text-white" />
-                            </Button>
-                        )}
-                        {state === "recording" && (
-                            <Button
-                                size="lg"
-                                onClick={stopRecording}
-                                variant="destructive"
-                                className="rounded-full w-16 h-16 p-0 animate-pulse-glow shadow-lg transition-all hover:scale-105"
-                                id="stop-recording-btn"
-                            >
-                                <Square className="w-6 h-6 fill-current" />
-                            </Button>
-                        )}
-                        {state === "processing" && (
-                            <div className="flex items-center gap-3 px-6 py-3 rounded-full bg-card border border-border/40">
-                                <Loader2 className="w-5 h-5 animate-spin text-cyan-400" />
-                                <span className="text-sm font-medium text-muted-foreground">
-                                    Extracting biomarkers…
-                                </span>
+                    {/* Controls */}
+                    <div className="flex flex-col items-center gap-4">
+                        <div className="text-center w-full">
+                            <div className="text-3xl font-mono font-medium tracking-tight text-foreground mb-4">
+                                {formatTime(duration)}
                             </div>
-                        )}
+                            <div className="flex justify-center items-center gap-4">
+                                {state === "idle" && (
+                                    <Button
+                                        onClick={startRecording}
+                                        className="rounded-full w-14 h-14 p-0 shrink-0 bg-primary hover:bg-primary/90 transition-transform hover:scale-105 shadow-sm"
+                                        title="Start Recording"
+                                    >
+                                        <Mic className="w-6 h-6 text-white" />
+                                    </Button>
+                                )}
+                                {state === "recording" && (
+                                    <Button
+                                        onClick={stopRecording}
+                                        variant="destructive"
+                                        className="rounded-full w-14 h-14 p-0 shrink-0 bg-red-600 hover:bg-red-700 transition-transform hover:scale-105 shadow-sm animate-pulse"
+                                        title="Stop Recording"
+                                    >
+                                        <Square className="w-5 h-5 fill-current" />
+                                    </Button>
+                                )}
+                                <div className="h-10 w-px bg-border mx-2 hidden sm:block"></div>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={state !== "idle"}
+                                    className="gap-2 text-sm font-medium border-border text-foreground hover:bg-secondary hidden sm:flex"
+                                >
+                                    <UploadCloud className="w-4 h-4" />
+                                    Upload Audio
+                                </Button>
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    className="hidden"
+                                    accept="audio/*"
+                                    onChange={handleFileUpload}
+                                />
+                            </div>
+                        </div>
                     </div>
                 </div>
             </CardContent>

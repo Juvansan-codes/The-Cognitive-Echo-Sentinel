@@ -47,112 +47,77 @@
   --radius-4xl: calc(var(--radius) + 16px);
 
   /* Custom medical palette */
-  --color-cyan-400: oklch(0.82 0.12 195);
-  --color-cyan-500: oklch(0.72 0.14 195);
-  --color-cyan-600: oklch(0.62 0.14 195);
-  --color-emerald-400: oklch(0.78 0.15 160);
-  --color-emerald-500: oklch(0.68 0.16 160);
-  --color-amber-400: oklch(0.82 0.16 80);
-  --color-amber-500: oklch(0.72 0.16 80);
-  --color-rose-400: oklch(0.72 0.19 15);
-  --color-rose-500: oklch(0.62 0.22 15);
-  --color-violet-400: oklch(0.72 0.18 290);
-  --color-violet-500: oklch(0.62 0.22 290);
-  --color-slate-700: oklch(0.35 0.01 260);
-  --color-slate-800: oklch(0.25 0.01 260);
-  --color-slate-900: oklch(0.18 0.01 260);
-  --color-slate-950: oklch(0.12 0.01 260);
+  --color-clinical-white: #FFFFFF;
+  --color-clinical-grey-bg: #F5F7F9;
+  --color-clinical-grey-border: #E4E7EC;
+  --color-clinical-blue: #2E5BFF;
+  --color-clinical-teal: #0E6F6F;
+  --color-clinical-green: #12B76A;
+  --color-clinical-amber: #F79009;
+  --color-clinical-red: #D92D20;
 }
 
-/* Dark medical theme as default */
+/* Light medical theme as default */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(0.12 0.01 260);
-  --foreground: oklch(0.95 0.01 260);
-  --card: oklch(0.17 0.012 260);
-  --card-foreground: oklch(0.95 0.01 260);
-  --popover: oklch(0.17 0.012 260);
-  --popover-foreground: oklch(0.95 0.01 260);
-  --primary: oklch(0.72 0.14 195);
-  --primary-foreground: oklch(0.12 0.01 260);
-  --secondary: oklch(0.22 0.012 260);
-  --secondary-foreground: oklch(0.90 0.01 260);
-  --muted: oklch(0.20 0.012 260);
-  --muted-foreground: oklch(0.60 0.01 260);
-  --accent: oklch(0.22 0.012 260);
-  --accent-foreground: oklch(0.90 0.01 260);
-  --destructive: oklch(0.62 0.22 15);
-  --border: oklch(1 0 0 / 8%);
-  --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.72 0.14 195);
-  --chart-1: oklch(0.72 0.14 195);
-  --chart-2: oklch(0.68 0.16 160);
-  --chart-3: oklch(0.72 0.18 290);
-  --chart-4: oklch(0.72 0.16 80);
-  --chart-5: oklch(0.62 0.22 15);
-  --sidebar: oklch(0.15 0.012 260);
-  --sidebar-foreground: oklch(0.95 0.01 260);
-  --sidebar-primary: oklch(0.72 0.14 195);
-  --sidebar-primary-foreground: oklch(0.95 0.01 260);
-  --sidebar-accent: oklch(0.22 0.012 260);
-  --sidebar-accent-foreground: oklch(0.95 0.01 260);
-  --sidebar-border: oklch(1 0 0 / 8%);
-  --sidebar-ring: oklch(0.72 0.14 195);
+  --radius: 8px;
+  /* Strict 8px border radius */
+  --background: #FFFFFF;
+  --foreground: #1D2939;
+  /* Dark slate */
+  --card: #F5F7F9;
+  --card-foreground: #1D2939;
+  --popover: #FFFFFF;
+  --popover-foreground: #1D2939;
+  --primary: #2E5BFF;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F2F4F7;
+  --secondary-foreground: #344054;
+  --muted: #F2F4F7;
+  --muted-foreground: #667085;
+  --accent: #F2F4F7;
+  --accent-foreground: #344054;
+  --destructive: #D92D20;
+  --border: #E4E7EC;
+  --input: #E4E7EC;
+  --ring: #2E5BFF;
+
+  --chart-1: #2E5BFF;
+  --chart-2: #12B76A;
+  --chart-3: #F79009;
+  --chart-4: #D92D20;
+  --chart-5: #0E6F6F;
+
+  --sidebar: #F5F7F9;
+  --sidebar-foreground: #1D2939;
+  --sidebar-primary: #2E5BFF;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #E4E7EC;
+  --sidebar-accent-foreground: #1D2939;
+  --sidebar-border: #E4E7EC;
+  --sidebar-ring: #2E5BFF;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
 }
 
 /* Custom utilities */
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 20px oklch(0.72 0.14 195 / 0.3); }
-  50% { box-shadow: 0 0 40px oklch(0.72 0.14 195 / 0.6); }
-}
-
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
-}
-
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-.animate-pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
-}
-
-.animate-float {
-  animation: float 6s ease-in-out infinite;
-}
-
-.animate-shimmer {
-  background-size: 200% 100%;
-  animation: shimmer 2s linear infinite;
-}
-
-/* Glassmorphism card */
-.glass-card {
-  background: oklch(0.17 0.012 260 / 0.6);
-  backdrop-filter: blur(16px);
-  border: 1px solid oklch(1 0 0 / 6%);
-}
-
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
-  background: oklch(0.40 0.01 260);
+  background: #D0D5DD;
   border-radius: 3px;
 }
