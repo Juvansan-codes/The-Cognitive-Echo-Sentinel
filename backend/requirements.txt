@@ -16,3 +16,5 @@ numba==0.60.0
 praat-parselmouth==0.4.3
 scikit-learn==1.6.1
 python-dotenv==1.0.1
+joblib==1.4.2
+httpx==0.28.1
