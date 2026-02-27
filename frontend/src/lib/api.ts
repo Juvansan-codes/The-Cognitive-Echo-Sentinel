@@ -36,9 +36,9 @@ export interface LexicalAnalysis {
 
 export interface RiskScores {
     acoustic_risk_score: number;
-    cognitive_risk_score: number;
+    cognitive_risk_score?: number | null;
     neuro_risk_level: "Low" | "Medium" | "High";
-    confidence: number;
+    confidence?: number | null;
 }
 
 export interface AnalysisResponse {
@@ -46,10 +46,14 @@ export interface AnalysisResponse {
     duration_seconds: number;
     acoustic_features: AcousticFeatures;
     baseline_comparison: BaselineComparison;
-    lexical_analysis: LexicalAnalysis;
+    lexical_analysis?: LexicalAnalysis | null;
     risk_scores: RiskScores;
     explanation: string;
     recommendations: string[];
+    // Reliability fields added by medical-grade-failure-handling
+    cognitive_available?: boolean;
+    lexical_status?: string;
+    lexical_error_message?: string | null;
 }
 
 // ─── API Functions ───────────────────────────────────────────────────────────

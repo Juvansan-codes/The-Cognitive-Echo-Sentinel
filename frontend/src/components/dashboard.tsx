@@ -61,7 +61,7 @@ function CircularGauge({ score, status }: { score: number; status: string }) {
     );
 }
 
-function MetricRow({ label, value, unit, limit, invertValue = false }: { label: string, value: number, unit: string, limit: number, invertValue?: boolean }) {
+function MetricRow({ label, value, unit, limit, invertValue = false, description }: { label: string, value: number, unit: string, limit: number, invertValue?: boolean, description?: string }) {
     // Determine progress percentage
     const progress = Math.min((value / limit) * 100, 100);
     // Simple clinical coloring based on inversion
@@ -74,8 +74,8 @@ function MetricRow({ label, value, unit, limit, invertValue = false }: { label: 
                     <span>{label}</span>
                     <div className="group relative hidden sm:flex">
                         <Info className="w-3.5 h-3.5 text-muted-foreground/50 cursor-help" />
-                        <div className="invisible group-hover:visible absolute left-5 top-0 w-48 p-2 bg-foreground text-background text-xs rounded-md z-10 font-normal">
-                            Assessed clinical parameter tracking variation against healthy baselines.
+                        <div className="invisible group-hover:visible absolute left-5 top-0 w-48 p-2 bg-foreground text-background text-xs rounded-md z-10 font-normal shadow-lg">
+                            {description || "Assessed clinical parameter tracking variation against healthy baselines."}
                         </div>
                     </div>
                 </div>
@@ -97,7 +97,7 @@ function MetricRow({ label, value, unit, limit, invertValue = false }: { label: 
 }
 
 export function Dashboard({ data }: DashboardProps) {
-    const { risk_scores, acoustic_features, lexical_analysis } = data;
+    const { risk_scores, acoustic_features, lexical_analysis, cognitive_available } = data;
 
     // Map the neuro risk to specific text requested by user
     let riskStateText = "Within Baseline Range";
@@ -130,16 +130,16 @@ export function Dashboard({ data }: DashboardProps) {
                             </div>
                             <CardTitle className="text-base font-semibold text-foreground">Acoustic Biomarker Analysis</CardTitle>
                         </div>
-                        <span className="text-xs font-semibold uppercase text-muted-foreground">Confidence: {(risk_scores.confidence * 100).toFixed(0)}%</span>
+                        <span className="text-xs font-semibold uppercase text-muted-foreground">Confidence: {((risk_scores.confidence ?? 0) * 100).toFixed(0)}%</span>
                     </div>
                 </CardHeader>
                 <CardContent className="p-6 bg-card">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                        <MetricRow label="Pause Time Deviation" value={acoustic_features.pause_ratio * 100} unit="ms" limit={50} />
-                        <MetricRow label="Pitch Stability" value={acoustic_features.pitch_stability * 100} unit="%" limit={100} invertValue={true} />
-                        <MetricRow label="Jitter" value={acoustic_features.jitter_percent} unit="%" limit={15} />
-                        <MetricRow label="Shimmer" value={acoustic_features.shimmer_percent} unit="%" limit={15} />
-                        <MetricRow label="Harmonics-to-Noise Ratio" value={acoustic_features.harmonics_to_noise} unit="dB" limit={30} invertValue={true} />
+                        <MetricRow label="Pause Time Deviation" value={acoustic_features.pause_ratio * 100} unit="ms" limit={50} description="Measures unexpected silences or hesitations during speech, often linked to cognitive load or motor hesitation." />
+                        <MetricRow label="Pitch Stability" value={acoustic_features.pitch_stability * 100} unit="%" limit={100} invertValue={true} description="Evaluates how consistent vocal cord vibration is. Lower stability can indicate loss of fine motor control." />
+                        <MetricRow label="Jitter" value={acoustic_features.jitter_percent} unit="%" limit={15} description="Cycle-to-cycle variation in fundamental frequency. High jitter often indicates vocal tremor or mild neuromuscular dysfunction." />
+                        <MetricRow label="Shimmer" value={acoustic_features.shimmer_percent} unit="%" limit={15} description="Cycle-to-cycle variation in voice amplitude (loudness). Elevated shimmer is an early sign of glottal instability." />
+                        <MetricRow label="Harmonics-to-Noise Ratio" value={acoustic_features.harmonics_to_noise} unit="dB" limit={30} invertValue={true} description="The ratio of acoustic energy in the voice to background acoustic noise. Lower values suggest vocal breathiness or hoarseness." />
                     </div>
                 </CardContent>
             </Card>
@@ -155,17 +155,27 @@ export function Dashboard({ data }: DashboardProps) {
                     </div>
                 </CardHeader>
                 <CardContent className="p-6 bg-card flex flex-col md:flex-row gap-8 items-center">
-                    <div className="flex-1 space-y-6 w-full">
-                        <MetricRow label="Lexical Density" value={lexical_analysis.vocabulary_richness} unit="%" limit={100} invertValue={true} />
-                        <MetricRow label="Repetition Frequency" value={lexical_analysis.repetition_index} unit="%" limit={25} />
-                        <MetricRow label="Sentence Coherence Score" value={lexical_analysis.coherence_score} unit="/100" limit={100} invertValue={true} />
-                    </div>
-                    <div className="bg-white border text-sm border-border rounded-lg p-5 flex-1 w-full text-foreground/80 leading-relaxed">
-                        <span className="font-semibold text-foreground block mb-2">Automated Analysis Summary</span>
-                        {lexical_analysis.summary}
-                        <br /><br />
-                        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Lexical Pattern Observation Completed</span>
-                    </div>
+                    {cognitive_available && lexical_analysis ? (
+                        <>
+                            <div className="flex-1 space-y-6 w-full">
+                                <MetricRow label="Lexical Density" value={lexical_analysis.vocabulary_richness} unit="%" limit={100} invertValue={true} description="The proportion of unique content words. A declining vocabulary richness over time may indicate early cognitive impairment." />
+                                <MetricRow label="Repetition Frequency" value={lexical_analysis.repetition_index} unit="%" limit={25} description="Frequency of repeating the exact same words or phrases. Increased repetition often correlates with working memory deficits." />
+                                <MetricRow label="Sentence Coherence Score" value={lexical_analysis.coherence_score} unit="/100" limit={100} invertValue={true} description="Measures logical flow and grammatical completeness. Sudden drops in coherence can be an early neural biomarker." />
+                            </div>
+                            <div className="bg-white border text-sm border-border rounded-lg p-5 flex-1 w-full text-foreground/80 leading-relaxed">
+                                <span className="font-semibold text-foreground block mb-2">Automated Analysis Summary</span>
+                                {lexical_analysis.summary}
+                                <br /><br />
+                                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Lexical Pattern Observation Completed</span>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="flex-1 py-6 text-center text-muted-foreground text-sm">
+                            <Brain className="w-8 h-8 mx-auto mb-3 opacity-30" />
+                            <p className="font-medium">Lexical Analysis Unavailable</p>
+                            <p className="text-xs mt-1">The AI language service could not be reached. Acoustic scoring is still active.</p>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
@@ -182,7 +192,7 @@ export function Dashboard({ data }: DashboardProps) {
                 <CardContent className="p-6 bg-card">
                     <div className="flex flex-col md:flex-row items-center gap-8 justify-between">
                         <div className="flex items-center gap-6">
-                            <CircularGauge score={risk_scores.cognitive_risk_score} status={risk_scores.neuro_risk_level} />
+                            <CircularGauge score={risk_scores.cognitive_risk_score ?? risk_scores.acoustic_risk_score} status={risk_scores.neuro_risk_level} />
                             <div>
                                 <h4 className="text-sm font-semibold text-foreground mb-1 uppercase tracking-wide">Early Biomarker Deviation Index</h4>
                                 <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md border font-semibold text-sm ${riskColorClass}`}>

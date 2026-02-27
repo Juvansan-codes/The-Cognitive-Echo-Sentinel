@@ -24,18 +24,26 @@ try:
     import librosa
 
     LIBROSA_AVAILABLE = True
-except ImportError:
+    logger.info("REAL_AUDIO_PIPELINE_ENABLED: librosa version %s loaded", librosa.__version__)
+except ImportError as e:
     LIBROSA_AVAILABLE = False
-    logger.warning("librosa not installed – using mock feature extraction")
+    logger.warning("MOCK_AUDIO_PIPELINE_ACTIVE: librosa not installed (%s)", e)
 
 try:
     import parselmouth
     from parselmouth.praat import call as praat_call
 
     PRAAT_AVAILABLE = True
-except ImportError:
+    logger.info("REAL_AUDIO_PIPELINE_ENABLED: parselmouth version %s loaded", parselmouth.__version__)
+except ImportError as e:
     PRAAT_AVAILABLE = False
-    logger.warning("parselmouth not installed – jitter/shimmer will be mocked")
+    logger.warning("MOCK_AUDIO_PIPELINE_ACTIVE: parselmouth not installed (%s)", e)
+
+# One-Time Startup Banner
+if LIBROSA_AVAILABLE:
+    logger.info("🎤 Audio Pipeline Status: REAL")
+else:
+    logger.warning("⚠️ Audio Pipeline Status: MOCK (librosa missing)")
 
 
 # ---------------------------------------------------------------------------
@@ -49,7 +57,10 @@ def extract_features(audio_bytes: bytes, sample_rate: int = 16_000) -> dict:
     Returns a dict matching the AcousticFeatures schema.
     """
     if LIBROSA_AVAILABLE:
+        logger.info("AUDIO_FEATURE_MODE=REAL")
         return _extract_real(audio_bytes, sample_rate)
+    
+    logger.warning("AUDIO_FEATURE_MODE=MOCK")
     return _extract_mock()
 
 
@@ -61,7 +72,13 @@ def _extract_real(audio_bytes: bytes, sr: int) -> dict:
     """Extract features using librosa + parselmouth."""
 
     # Load audio
-    y, sr = librosa.load(io.BytesIO(audio_bytes), sr=sr, mono=True)
+    # Load audio
+    try:
+        y, sr = librosa.load(io.BytesIO(audio_bytes), sr=sr, mono=True)
+    except Exception as e:
+        logger.error("MOCK_AUDIO_PIPELINE_ACTIVE: librosa failed to decode audio format (%s). WebM Opus requires system FFmpeg. Falling back to mock acoustics.", e)
+        return _extract_mock()
+        
     duration = librosa.get_duration(y=y, sr=sr)
 
     # ---- MFCC ----

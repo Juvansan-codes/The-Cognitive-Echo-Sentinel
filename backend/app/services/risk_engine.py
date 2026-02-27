@@ -404,20 +404,22 @@ def generate_explanation(
     parts: list[str] = []
     recs: list[str] = []
 
+    display_score = cognitive if cognitive is not None else acoustic
+
     # Opening
     if level == "Low":
         parts.append(
-            f"Overall cognitive risk assessment is **Low** (score: {cognitive}/100). "
+            f"Overall risk assessment is **Low** (score: {display_score:.1f}/100). "
             "Voice biomarkers are within healthy parameters."
         )
     elif level == "Medium":
         parts.append(
-            f"Cognitive risk assessment is **Medium** (score: {cognitive}/100). "
+            f"Risk assessment is **Medium** (score: {display_score:.1f}/100). "
             "Some acoustic markers show mild deviation from expected baseline patterns."
         )
     else:
         parts.append(
-            f"Cognitive risk assessment is **High** (score: {cognitive}/100). "
+            f"Risk assessment is **High** (score: {display_score:.1f}/100). "
             "Multiple voice biomarkers show significant deviation from baseline. "
             "Professional evaluation is recommended."
         )
@@ -437,7 +439,7 @@ def generate_explanation(
         recs.append("Schedule a follow-up recording in 2 weeks to track progression.")
 
     # Lexical
-    if lexical.get("coherence_score", 80) < 65:
+    if lexical and lexical.get("coherence_score", 80) < 65:
         parts.append("Lexical analysis indicates reduced semantic coherence in speech content.")
         recs.append("Consider a brief cognitive screening (e.g., MoCA) with your primary care provider.")
 

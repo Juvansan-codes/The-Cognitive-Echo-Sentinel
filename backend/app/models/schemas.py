@@ -67,7 +67,7 @@ class AnalysisResponse(BaseModel):
     duration_seconds: float
     acoustic_features: AcousticFeatures
     baseline_comparison: BaselineComparison
-    lexical_analysis: LexicalAnalysis
+    lexical_analysis: Optional[LexicalAnalysis] = Field(default=None, description="Lexical analysis results")
     lexical_metrics: Optional[LexicalMetrics] = Field(default=None, description="Featherless AI lexical analysis (None if unavailable)")
     risk_scores: RiskScores
     cognitive_available: bool = Field(default=True, description="Whether cognitive/lexical analysis was completed")

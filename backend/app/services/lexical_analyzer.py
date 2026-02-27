@@ -27,7 +27,7 @@ logger = logging.getLogger("cognitive-echo.lexical")
 # ─── Configuration ────────────────────────────────────────────────────────────
 
 FEATHERLESS_API_URL = "https://api.featherless.ai/v1/chat/completions"
-FEATHERLESS_MODEL = "meta-llama/Llama-3-70b-chat-hf"
+FEATHERLESS_MODEL = "meta-llama/Meta-Llama-3-8B-Instruct"
 FEATHERLESS_TEMPERATURE = 0.2
 FEATHERLESS_MAX_TOKENS = 300
 REQUEST_TIMEOUT_SECONDS = 60.0
@@ -60,34 +60,22 @@ async def analyze_lexical_cognition(transcript: str) -> dict[str, Any]:
     """
     Analyze cognitive-linguistic markers in a speech transcript using
     Featherless AI (Llama 3 70B).
-
-    Args:
-        transcript: The speech-to-text transcript to analyze.
-
-    Returns:
-        A dictionary with keys:
-            - vocabulary_richness (float, 0-1)
-            - sentence_coherence (float, 0-1)
-            - word_finding_difficulty (float, 0-1)
-            - repetition_tendency (float, 0-1)
-            - cognitive_concern (str: "Low" | "Medium" | "High")
-
-    Raises:
-        ValueError: If the transcript is empty or whitespace-only.
-        RuntimeError: If the API call fails or returns unparseable output.
     """
     # ── Input validation ──────────────────────────────────────────────
     if not transcript or not transcript.strip():
+        logger.warning("LLM_CALL_FAILED: Transcript is empty")
         raise ValueError("Transcript must be a non-empty string.")
+
+    transcript_len = len(transcript.strip())
+    if transcript_len < 10:
+        logger.warning("LLM_CALL_FAILED: Transcript too short (%d chars)", transcript_len)
+        raise ValueError("Transcript must be at least 10 characters for lexical analysis.")
 
     # ── Resolve API key ───────────────────────────────────────────────
     api_key = os.getenv("FEATHERLESS_API_KEY")
     if not api_key:
-        logger.error("FEATHERLESS_API_KEY environment variable is not set.")
-        raise RuntimeError(
-            "Featherless API key is not configured. "
-            "Set the FEATHERLESS_API_KEY environment variable."
-        )
+        logger.error("LLM_CALL_FAILED: FEATHERLESS_API_KEY environment variable is missing.")
+        raise RuntimeError("Featherless API key is not configured. Set the FEATHERLESS_API_KEY environment variable.")
 
     # ── Build request payload ─────────────────────────────────────────
     payload: dict[str, Any] = {
@@ -111,13 +99,10 @@ async def analyze_lexical_cognition(transcript: str) -> dict[str, Any]:
     }
 
     # ── Call Featherless API (with retry + backoff) ───────────────────
-    logger.info(
-        "Sending transcript (%d chars) to Featherless AI (%s)…",
-        len(transcript),
-        FEATHERLESS_MODEL,
-    )
+    logger.info("LLM_CALL_STARTED: Sending transcript (%d chars) to %s", transcript_len, FEATHERLESS_MODEL)
 
     last_error: Exception | None = None
+    response = None
 
     for attempt in range(1, MAX_RETRIES + 2):  # attempt 1, 2, 3
         try:
@@ -129,19 +114,26 @@ async def analyze_lexical_cognition(transcript: str) -> dict[str, Any]:
                     json=payload,
                     headers=headers,
                 )
+            
+            # Handle specific auth or bad request errors immediately without retrying
+            if response.status_code in (401, 403):
+                logger.error("LLM_CALL_FAILED: Authentication error (HTTP %d)", response.status_code)
+                raise RuntimeError(f"Invalid or unauthorized Featherless API Key (HTTP {response.status_code})")
+            
+            # Raise exception for other errors (e.g., 500, 429) to trigger retry
+            response.raise_for_status()
+            
             break  # success – exit retry loop
+            
         except httpx.TimeoutException as exc:
             last_error = exc
-            logger.warning(
-                "Featherless API timeout (attempt %d/%d): %s",
-                attempt, MAX_RETRIES + 1, exc,
-            )
-        except httpx.HTTPError as exc:
+            logger.warning("Featherless API timeout (attempt %d/%d): %s", attempt, MAX_RETRIES + 1, exc)
+        except httpx.HTTPStatusError as exc:
             last_error = exc
-            logger.warning(
-                "Featherless API HTTP error (attempt %d/%d): %s",
-                attempt, MAX_RETRIES + 1, exc,
-            )
+            logger.warning("Featherless API HTTP error %d (attempt %d/%d): %s", exc.response.status_code, attempt, MAX_RETRIES + 1, exc)
+        except httpx.RequestError as exc:
+            last_error = exc
+            logger.warning("Featherless API Request error (attempt %d/%d): %s", attempt, MAX_RETRIES + 1, exc)
 
         if attempt <= MAX_RETRIES:
             backoff = BASE_BACKOFF_SECONDS * (2 ** (attempt - 1))
@@ -149,50 +141,27 @@ async def analyze_lexical_cognition(transcript: str) -> dict[str, Any]:
             await asyncio.sleep(backoff)
     else:
         # All retries exhausted
-        error_msg = (
-            f"Featherless API unreachable after {MAX_RETRIES + 1} attempts. "
-            f"Last error: {last_error}"
-        )
-        logger.error(error_msg)
+        error_msg = f"Featherless API unreachable after {MAX_RETRIES + 1} attempts. Last error: {last_error}"
+        logger.error("LLM_CALL_FAILED: %s", error_msg)
         raise RuntimeError(error_msg)
-
-    # ── Validate HTTP status ──────────────────────────────────────────
-    if response.status_code != 200:
-        logger.error(
-            "Featherless API returned status %d: %s",
-            response.status_code,
-            response.text[:500],
-        )
-        raise RuntimeError(
-            f"Featherless API returned HTTP {response.status_code}. "
-            f"Details: {response.text[:300]}"
-        )
 
     # ── Extract completion text ───────────────────────────────────────
     try:
         api_response: dict[str, Any] = response.json()
-        content: str = (
-            api_response["choices"][0]["message"]["content"].strip()
-        )
-    except (KeyError, IndexError, TypeError) as exc:
-        logger.error("Unexpected Featherless API response structure: %s", exc)
-        raise RuntimeError(
-            "Featherless API returned an unexpected response format."
-        ) from exc
+        content: str = api_response["choices"][0]["message"]["content"].strip()
+    except (KeyError, IndexError, TypeError, ValueError) as exc:
+        logger.error("LLM_CALL_FAILED: Unexpected API response structure. HTTP %d: %s", response.status_code, exc)
+        if response.text:
+            logger.debug("Raw response: %s", response.text[:500])
+        raise RuntimeError("Featherless API returned an unexpected response format.") from exc
 
-    logger.info("Received Featherless response (%d chars).", len(content))
+    logger.info("LLM_CALL_SUCCESS: Received Featherless response (%d chars). HTTP: %d", len(content), response.status_code)
 
     # ── Parse JSON from LLM output ────────────────────────────────────
     result = _parse_llm_json(content)
 
     # ── Validate required keys ────────────────────────────────────────
     _validate_result(result)
-
-    logger.info(
-        "Lexical analysis complete — concern: %s, coherence: %.2f",
-        result["cognitive_concern"],
-        result["sentence_coherence"],
-    )
 
     return result
 

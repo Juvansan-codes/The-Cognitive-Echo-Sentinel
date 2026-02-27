@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AudioRecorder, type RecordingState } from "@/components/audio-recorder";
 import { Dashboard } from "@/components/dashboard";
+import { GuidedReading } from "@/components/guided-reading";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { submitAudioSimulation } from "@/services/assessment";
 import type { AnalysisResponse } from "@/lib/api";
@@ -48,6 +49,8 @@ export default function AssessmentPage() {
 
                 {/* Left Column (Speech Input Panel) */}
                 <div className="xl:col-span-4 flex flex-col gap-6 sticky top-24">
+                    <GuidedReading />
+
                     <AudioRecorder
                         state={recordingState}
                         onStateChange={setRecordingState}

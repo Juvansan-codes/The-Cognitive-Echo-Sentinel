@@ -8,7 +8,6 @@ import { logout } from "@/services/auth";
 const navigation = [
     { name: "Self Assessment", href: "/assessment", icon: LayoutDashboard },
     { name: "Assessment History", href: "/history", icon: History },
-    { name: "Patient Profiles", href: "/profiles", icon: Users },
     { name: "Reports", href: "/reports", icon: FileText },
     { name: "Settings", href: "/settings", icon: Settings },
 ];
@@ -44,8 +43,8 @@ export function Sidebar() {
                             key={item.name}
                             href={item.href}
                             className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${isActive
-                                    ? "bg-white text-primary shadow-sm border border-border"
-                                    : "text-muted-foreground hover:bg-black/5 hover:text-foreground border border-transparent"
+                                ? "bg-white text-primary shadow-sm border border-border"
+                                : "text-muted-foreground hover:bg-black/5 hover:text-foreground border border-transparent"
                                 }`}
                         >
                             <item.icon className="w-4 h-4 shrink-0" />
