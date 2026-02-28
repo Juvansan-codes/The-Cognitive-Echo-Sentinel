@@ -1,4 +1,4 @@
-import { mockApiCall } from "./api";
+import { supabase } from "@/lib/supabase";
 
 export interface UserSession {
     token: string;
@@ -16,70 +16,85 @@ export async function login(email: string, password: string): Promise<UserSessio
         throw new Error("Invalid credentials");
     }
 
-    const session: UserSession = {
-        token: "mock-jwt-token-12345",
-        user: {
-            id: "u_8492",
-            firstName: "Dr. Jane",
-            lastName: "Smith",
-            email: email,
-            institution: "Stanford Medical Research",
-        }
-    };
+    const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+    });
 
-    if (typeof window !== "undefined") {
-        localStorage.setItem("session_token", session.token);
-        localStorage.setItem("session_user", JSON.stringify(session.user));
-        document.cookie = `session_token=${session.token}; path=/; max-age=86400`;
+    if (error || !data.session) {
+        throw new Error(error?.message || "Login failed");
     }
 
-    return await mockApiCall(session, 1200);
+    const { session } = data;
+
+    return {
+        token: session.access_token,
+        user: {
+            id: session.user.id,
+            firstName: session.user.user_metadata?.firstName || "Unknown",
+            lastName: session.user.user_metadata?.lastName || "",
+            email: session.user.email || "",
+            institution: session.user.user_metadata?.institution || "",
+        }
+    };
 }
 
 export async function register(data: Record<string, any>): Promise<UserSession> {
-    const session: UserSession = {
-        token: "mock-jwt-token-12345",
+    const { email, password, firstName, lastName, institution } = data;
+
+    if (!email || !password) {
+        throw new Error("Email and password are required.");
+    }
+
+    const { data: authData, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+            data: {
+                firstName,
+                lastName,
+                institution
+            }
+        }
+    });
+
+    if (error || !authData.session) {
+        throw new Error(error?.message || "Registration failed. Please check your credentials.");
+    }
+
+    const { session } = authData;
+
+    return {
+        token: session.access_token,
         user: {
-            id: "u_" + Math.floor(Math.random() * 10000),
-            firstName: data.firstName || "New",
-            lastName: data.lastName || "User",
-            email: data.email,
-            institution: data.institution || "Independent Researcher",
+            id: session.user.id,
+            firstName: session.user.user_metadata?.firstName || "Unknown",
+            lastName: session.user.user_metadata?.lastName || "",
+            email: session.user.email || "",
+            institution: session.user.user_metadata?.institution || "",
         }
     };
-
-    if (typeof window !== "undefined") {
-        localStorage.setItem("session_token", session.token);
-        localStorage.setItem("session_user", JSON.stringify(session.user));
-        document.cookie = `session_token=${session.token}; path=/; max-age=86400`;
-    }
-
-    return await mockApiCall(session, 1500);
 }
 
-export function logout() {
-    if (typeof window !== "undefined") {
-        localStorage.removeItem("session_token");
-        localStorage.removeItem("session_user");
-        document.cookie = 'session_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-    }
+export async function logout() {
+    await supabase.auth.signOut();
 }
 
-export function getSession(): UserSession | null {
-    if (typeof window === "undefined") return null;
+export async function getSession(): Promise<UserSession | null> {
+    const { data: { session } } = await supabase.auth.getSession();
 
-    try {
-        const token = localStorage.getItem("session_token");
-        const userStr = localStorage.getItem("session_user");
-
-        if (token && userStr) {
-            return {
-                token,
-                user: JSON.parse(userStr)
-            };
-        }
-    } catch {
+    if (!session) {
         return null;
     }
-    return null;
+
+    return {
+        token: session.access_token,
+        user: {
+            id: session.user.id,
+            firstName: session.user.user_metadata?.firstName || "Unknown",
+            lastName: session.user.user_metadata?.lastName || "",
+            email: session.user.email || "",
+            institution: session.user.user_metadata?.institution || "",
+        }
+    };
 }

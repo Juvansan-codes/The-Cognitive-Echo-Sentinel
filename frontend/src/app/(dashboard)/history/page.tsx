@@ -19,9 +19,17 @@ export default function HistoryPage() {
     useEffect(() => {
         async function fetchHistory() {
             try {
+                const { data: { user } } = await supabase.auth.getUser();
+
+                if (!user) {
+                    setLoading(false);
+                    return;
+                }
+
                 const { data, error } = await supabase
                     .from("assessments")
                     .select("*")
+                    .eq("user_id", user.id)
                     .order("created_at", { ascending: false });
 
                 if (error) {

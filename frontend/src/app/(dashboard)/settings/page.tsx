@@ -11,8 +11,11 @@ export default function SettingsPage() {
     const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
-        // eslint-disable-next-line
-        setSession(getSession());
+        async function fetchSession() {
+            const currentSession = await getSession();
+            setSession(currentSession);
+        }
+        fetchSession();
     }, []);
 
     const handleDeleteAccount = async () => {

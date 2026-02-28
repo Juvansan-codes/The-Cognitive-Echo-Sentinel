@@ -43,7 +43,10 @@ export default function AssessmentPage() {
     const handleGenerateReport = async () => {
         setIsSaving(true);
         try {
+            const { data: { user } } = await supabase.auth.getUser();
+
             const { error: dbError } = await supabase.from('assessments').insert({
+                user_id: user?.id,
                 pitch_hz: results.test1?.acoustic_features.mean_pitch_hz,
                 jitter_percent: results.test1?.acoustic_features.jitter_percent,
                 shimmer_percent: results.test1?.acoustic_features.shimmer_percent,
