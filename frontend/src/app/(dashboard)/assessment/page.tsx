@@ -203,11 +203,10 @@ export default function AssessmentPage() {
                     <div className="bg-black/5 rounded-xl border border-border p-2 mb-6 shadow-inner mx-auto max-w-2xl flex justify-center overflow-hidden">
                         {/* Using standard Cookie Theft clinical assessment img placeholder */}
                         <img
-                            src="https://www.alz.washington.edu/NONMEM/images/cookie.jpg"
-                            alt="Cookie Theft Assessment Diagnostic"
-                            className="rounded-lg object-contain max-h-[350px] mix-blend-multiply opacity-90 sepia-[.2] contrast-125"
-                            onError={(e) => {
-                                e.currentTarget.src = "https://images.unsplash.com/photo-1556910103-1c02745a8e31?q=80&w=2670&auto=format&fit=crop"; // Fallback kitchen scene
+                            src="/image-1.jpg"
+                            alt="Standardized Clinical Assessment Picture"
+                            className="rounded-lg object-contain max-h-[350px]"
+
                             }}
                         />
                     </div>
