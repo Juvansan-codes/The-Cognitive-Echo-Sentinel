@@ -47,19 +47,21 @@ export async function middleware(request: NextRequest) {
         return supabaseResponse;
     }
 
-    // Redirect to login if accessing a protected route without a user session
-    if (isProtectedRoute && !user) {
-        const url = request.nextUrl.clone();
-        url.pathname = "/login";
-        return NextResponse.redirect(url);
-    }
+    // --- BYPASS AUTH FOR TESTING ---
+    // // Redirect to login if accessing a protected route without a user session
+    // if (isProtectedRoute && !user) {
+    //     const url = request.nextUrl.clone();
+    //     url.pathname = "/login";
+    //     return NextResponse.redirect(url);
+    // }
 
-    // Redirect to dashboard if trying to login/register while already authenticated
-    if (isAuthRoute && user) {
-        const url = request.nextUrl.clone();
-        url.pathname = "/assessment";
-        return NextResponse.redirect(url);
-    }
+    // // Redirect to dashboard if trying to login/register while already authenticated
+    // // if (isAuthRoute && user) {
+    // //     const url = request.nextUrl.clone();
+    // //     url.pathname = "/assessment";
+    // //     return NextResponse.redirect(url);
+    // // }
+    // -------------------------------
 
     return supabaseResponse;
 }

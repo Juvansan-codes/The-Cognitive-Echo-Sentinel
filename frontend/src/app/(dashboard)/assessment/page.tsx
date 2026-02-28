@@ -206,8 +206,6 @@ export default function AssessmentPage() {
                             src="/image-1.jpg"
                             alt="Standardized Clinical Assessment Picture"
                             className="rounded-lg object-contain max-h-[350px]"
-
-                            }}
                         />
                     </div>
 
