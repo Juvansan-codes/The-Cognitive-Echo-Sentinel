@@ -158,9 +158,9 @@ export function Dashboard({ data }: DashboardProps) {
                     {cognitive_available && (lexical_analysis || lexical_metrics) ? (
                         <>
                             <div className="flex-1 space-y-6 w-full">
-                                <MetricRow label="Lexical Density" value={lexical_metrics?.vocabulary_richness ?? 0} unit="%" limit={100} invertValue={true} description="The proportion of unique content words. A declining vocabulary richness over time may indicate early cognitive impairment." />
-                                <MetricRow label="Repetition Frequency" value={lexical_metrics?.repetition_tendency ?? 0} unit="%" limit={25} description="Frequency of repeating the exact same words or phrases. Increased repetition often correlates with working memory deficits." />
-                                <MetricRow label="Sentence Coherence Score" value={lexical_metrics?.sentence_coherence ?? 0} unit="/100" limit={100} invertValue={true} description="Measures logical flow and grammatical completeness. Sudden drops in coherence can be an early neural biomarker." />
+                                <MetricRow label="Lexical Density" value={(lexical_metrics?.vocabulary_richness ?? 0) * 100} unit="%" limit={100} invertValue={true} description="The proportion of unique content words. A declining vocabulary richness over time may indicate early cognitive impairment." />
+                                <MetricRow label="Repetition Frequency" value={(lexical_metrics?.repetition_tendency ?? 0) * 100} unit="%" limit={25} description="Frequency of repeating the exact same words or phrases. Increased repetition often correlates with working memory deficits." />
+                                <MetricRow label="Sentence Coherence Score" value={(lexical_metrics?.sentence_coherence ?? 0) * 100} unit="/100" limit={100} invertValue={true} description="Measures logical flow and grammatical completeness. Sudden drops in coherence can be an early neural biomarker." />
                             </div>
                             <div className="bg-white border text-sm border-border rounded-lg p-5 flex-1 w-full text-foreground/80 leading-relaxed">
                                 <span className="font-semibold text-foreground block mb-2">Automated Analysis Summary</span>
