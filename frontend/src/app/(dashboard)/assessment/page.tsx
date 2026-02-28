@@ -6,8 +6,9 @@ import { Dashboard } from "@/components/dashboard";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { analyzeAudio } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 import type { AnalysisResponse } from "@/lib/api";
-import { AlertTriangle, CheckCircle2, ChevronRight, FileText, ImageIcon, Mic, RefreshCw } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronRight, FileText, ImageIcon, Mic, RefreshCw, Loader2 } from "lucide-react";
 
 type AssessmentStep = 0 | 1 | 2 | 3;
 
@@ -18,6 +19,7 @@ interface AssessmentResults {
 
 export default function AssessmentPage() {
     const [step, setStep] = useState<AssessmentStep>(0);
+    const [isSaving, setIsSaving] = useState(false);
     const [recordingState, setRecordingState] = useState<RecordingState>("idle");
     const [error, setError] = useState<string | null>(null);
     const [results, setResults] = useState<AssessmentResults>({ test1: null, test2: null });
@@ -35,6 +37,39 @@ export default function AssessmentPage() {
             setError(err instanceof Error ? err.message : "System error processing sample.");
         } finally {
             setRecordingState("idle");
+        }
+    };
+
+    const handleGenerateReport = async () => {
+        setIsSaving(true);
+        try {
+            const { error: dbError } = await supabase.from('assessments').insert({
+                pitch_hz: results.test1?.acoustic_features.mean_pitch_hz,
+                jitter_percent: results.test1?.acoustic_features.jitter_percent,
+                shimmer_percent: results.test1?.acoustic_features.shimmer_percent,
+                pitch_stability: results.test1?.acoustic_features.pitch_stability,
+                pause_ratio: results.test1?.acoustic_features.pause_ratio,
+                harmonics_to_noise: results.test1?.acoustic_features.harmonics_to_noise,
+                acoustic_risk_score: results.test1?.risk_scores.acoustic_risk_score,
+                vocabulary_richness: results.test2?.lexical_metrics?.vocabulary_richness,
+                sentence_coherence: results.test2?.lexical_metrics?.sentence_coherence,
+                word_finding_difficulty: results.test2?.lexical_metrics?.word_finding_difficulty,
+                repetition_tendency: results.test2?.lexical_metrics?.repetition_tendency,
+                cognitive_concern: results.test2?.lexical_metrics?.cognitive_concern,
+                neuro_risk_level: results.test2?.risk_scores.neuro_risk_level,
+                final_risk_score: results.test2?.risk_scores.cognitive_risk_score ?? results.test2?.risk_scores.acoustic_risk_score,
+                explanation: results.test2?.explanation,
+                cognitive_available: results.test2?.cognitive_available
+            });
+
+            if (dbError) {
+                console.warn("[Supabase] Failed to securely persist history:", dbError.message);
+            }
+        } catch (err) {
+            console.warn("Report storage failed", err);
+        } finally {
+            setIsSaving(false);
+            setStep(3); // Proceed to Dashboard un-blocked
         }
     };
 
@@ -187,8 +222,12 @@ export default function AssessmentPage() {
 
                         {/* Show Analyze button only after successful analysis */}
                         {results.test2 && recordingState === "idle" && (
-                            <Button size="lg" className="w-full md:w-auto h-12 px-8 rounded-full bg-emerald-600 hover:bg-emerald-700 animate-in fade-in zoom-in-95 shadow-lg shadow-emerald-600/20" onClick={() => setStep(3)}>
-                                Generate Clinical Report <FileText className="ml-2 w-4 h-4" />
+                            <Button size="lg" disabled={isSaving} className="w-full md:w-auto h-12 px-8 rounded-full bg-emerald-600 hover:bg-emerald-700 animate-in fade-in zoom-in-95 shadow-lg shadow-emerald-600/20" onClick={handleGenerateReport}>
+                                {isSaving ? (
+                                    <>Saving Report... <Loader2 className="ml-2 w-4 h-4 animate-spin" /></>
+                                ) : (
+                                    <>Generate Clinical Report <FileText className="ml-2 w-4 h-4" /></>
+                                )}
                             </Button>
                         )}
                     </div>
