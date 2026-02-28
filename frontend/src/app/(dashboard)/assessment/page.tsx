@@ -252,10 +252,12 @@ export default function AssessmentPage() {
                         {/* We inject the Lexical data from Test 2 into Test 1's shell to present a unified frontend card set */}
                         <Dashboard data={{
                             ...results.test1,
-                            lexical_analysis: results.test2.lexical_analysis,
-                            lexical_metrics: results.test2.lexical_metrics,
-                            cognitive_available: results.test2.cognitive_available,
-                            risk_scores: results.test2.risk_scores // Use the final blended risk from the final test
+                            lexical_analysis: results.test2?.lexical_analysis,
+                            lexical_metrics: results.test2?.lexical_metrics,
+                            cognitive_available: results.test2?.cognitive_available,
+                            risk_scores: results.test2?.risk_scores, // Use the final blended risk from the final test
+                            explanation: results.test2?.explanation,
+                            recommendations: results.test2?.recommendations
                         }} />
                     </div>
                 </div>
