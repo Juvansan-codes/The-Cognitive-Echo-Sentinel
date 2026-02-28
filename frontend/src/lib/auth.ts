@@ -59,7 +59,8 @@ export async function register(data: Record<string, any>): Promise<UserSession> 
     });
 
     if (error || !authData.session) {
-        throw new Error(error?.message || "Registration failed.");
+        console.error("[Supabase Auth Raw Error]:", error);
+        throw new Error(error?.message || (error as unknown as string) || "Registration failed. No session returned.");
     }
 
     const { session } = authData;
