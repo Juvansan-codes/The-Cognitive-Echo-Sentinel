@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Activity, LayoutDashboard, History, Users, FileText, Settings, LogOut } from "lucide-react";
-import { logout } from "@/services/auth";
+import { logout } from "@/lib/auth";
 
 const navigation = [
     { name: "Self Assessment", href: "/assessment", icon: LayoutDashboard },

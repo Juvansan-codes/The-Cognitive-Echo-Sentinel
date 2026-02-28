@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { login } from "@/services/auth";
+import { login } from "@/lib/auth";
 import { Activity, ShieldAlert, Loader2 } from "lucide-react";
 
 export default function LoginPage() {

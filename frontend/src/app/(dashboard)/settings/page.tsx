@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getSession, UserSession, logout } from "@/services/auth";
+import { getSession, UserSession, logout } from "@/lib/auth";
 import { Settings as SettingsIcon, Lock, Trash2, KeyRound } from "lucide-react";
 
 export default function SettingsPage() {
