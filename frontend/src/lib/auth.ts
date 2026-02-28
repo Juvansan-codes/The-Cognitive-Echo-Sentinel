@@ -59,7 +59,7 @@ export async function register(data: Record<string, any>): Promise<UserSession> 
     });
 
     if (error || !authData.session) {
-        throw new Error(error?.message || "Registration failed. Please check your credentials.");
+        throw new Error(error?.message || "Registration failed.");
     }
 
     const { session } = authData;
